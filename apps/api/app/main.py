@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from app.core.errors import register_exception_handlers
 from app.database import database
 from app.api.v1.router import api_v1_router
 
@@ -34,3 +35,5 @@ app.add_middleware(
 )
 
 app.include_router(api_v1_router, prefix="/api/v1")
+
+register_exception_handlers(app)

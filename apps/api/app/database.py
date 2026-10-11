@@ -25,11 +25,15 @@ class Database:
     def is_connected(self) -> bool:
         return self._client is not None
 
-    async def connect(self) -> None:
-        """Create (or re-create) the shared HTTP client; idempotent."""
+    async def connect(self, url: str | None = None) -> None:
+        """Create (or re-create) the shared HTTP client; idempotent.
+
+        `url` overrides `settings.database_url` (used by tests to bind a
+        local SQLite file through the same Hrana facade).
+        """
         if self._client is None:
             self._client = libsql_client.create_client(
-                url=settings.database_url,
+                url=url or settings.database_url,
                 auth_token=settings.database_auth_token or None,
             )
 
@@ -50,13 +54,14 @@ class Database:
         result_set = await self._client.execute(sql, args=args)
         return [row.asdict() for row in result_set.rows]
 
-    async def execute_batch(self, statements: list[str]) -> list[list[dict[str, Any]]]:
-        """Execute multiple statements transactionally; rows materialized per statement."""
+    async def execute_batch(
+        self, statements: list[tuple[str, list[Any]]]
+    ) -> list[list[dict[str, Any]]]:
+        """Execute (sql, args) pairs transactionally; rows materialized per statement."""
         if self._client is None:
             raise RuntimeError("Database is not connected")
         result_sets = await self._client.batch(
-            [libsql_client.Statement(sql) for sql in statements],
-            transaction=True,
+            [libsql_client.Statement(sql, args=args) for sql, args in statements]
         )
         return [
             [row.asdict() for row in result_set.rows] for result_set in result_sets

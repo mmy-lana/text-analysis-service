@@ -30,12 +30,12 @@
   - [x] Write pytest test suite `apps/api/tests/test_readability.py` validating metrics against standardized literary reference passages.
   - [x] Build frontend readability UI `GradeBandCard.svelte`, `MetricGrid.svelte`, and `SentenceHighlighter.svelte`.
 
-- [ ] Task 5: Feature Module 3 (Historical Archive & Persistence Engine) end-to-end implementation
-  - [ ] Implement asynchronous Turso database repository in `apps/api/app/api/v1/history.py` for persistent report storage.
-  - [ ] Implement pagination, searching by keyword, and deletion endpoints with API key isolation.
-  - [ ] Build SvelteKit historical archive explorer route `apps/web/src/routes/history/+page.svelte`.
-  - [ ] Implement offline-fallback synchronization using client-side IndexedDB when the local or cloud database is unreachable.
-  - [ ] Write integration tests verifying database transactions, rollbacks, and foreign-key cascading removals.
+- [x] Task 5: Feature Module 3 (Historical Archive & Persistence Engine) end-to-end implementation
+  - [x] Implement asynchronous Turso database repository in `apps/api/app/api/v1/history.py` for persistent report storage.
+  - [x] Implement pagination, searching by keyword, and deletion endpoints with API key isolation.
+  - [x] Build SvelteKit historical archive explorer route `apps/web/src/routes/history/+page.svelte`.
+  - [x] Implement offline-fallback synchronization using client-side IndexedDB when the local or cloud database is unreachable.
+  - [x] Write integration tests verifying database transactions, rollbacks, and foreign-key cascading removals.
 
 - [ ] Task 6: Routing shell, responsive page assembly, and production build verification
   - [ ] Assemble root layout `+layout.svelte`, `EditorialHeader.svelte`, and `EditorialFooter.svelte` matching paper-serif aesthetic.

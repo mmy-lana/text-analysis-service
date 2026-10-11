@@ -26,3 +26,10 @@ class HistoryItemSummaryModel(BaseSchema):
     sentiment_classification: SentimentClassificationEnum
     cefr_equivalent: CEFREquivalentEnum
     created_at: datetime
+
+
+class PaginatedHistoryModel(BaseSchema):
+    items: list[HistoryItemSummaryModel]
+    total: int
+    page: int
+    page_size: int
