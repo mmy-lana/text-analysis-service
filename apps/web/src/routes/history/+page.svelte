@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { PaperCard, EditorialButton, StatusBadge } from '$lib/components/ui/index.ts';
-  import { historyRepository } from '$lib/stores/historyStore.svelte.ts';
-  import type { HistoryFetchResult } from '$lib/stores/historyStore.svelte.ts';
+  import { PaperCard, EditorialButton, StatusBadge } from '#lib/components/ui/index.ts';
+  import { historyRepository } from '#lib/stores/historyStore.svelte.ts';
+  import type { HistoryFetchResult } from '#lib/stores/historyStore.svelte.ts';
   import type { HistoryItemSummary } from '@repo/shared-types';
 
   interface Props {

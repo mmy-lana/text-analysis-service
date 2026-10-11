@@ -29,6 +29,9 @@ COPY --from=builder /opt/venv /opt/venv
 COPY app ./app
 COPY uvicorn_entry.py ./
 
+# Guarantee world-readable application code regardless of build-host umask.
+RUN chmod -R a+rX /srv
+
 USER app
 
 EXPOSE 8000

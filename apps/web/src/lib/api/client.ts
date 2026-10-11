@@ -1,4 +1,8 @@
-import type { ProblemDetails, SentimentAnalysisResult, ReadabilityAnalysisResult } from '@repo/shared-types';
+import type {
+  ProblemDetails,
+  SentimentAnalysisResult,
+  ReadabilityAnalysisResult
+} from '@repo/shared-types';
 import { endpoints } from './endpoints';
 
 export class ApiError extends Error {
@@ -13,15 +17,25 @@ export class ApiError extends Error {
   }
 }
 
-async function postJson<TResponse>(url: string, body: unknown): Promise<TResponse> {
+export interface RequestOptions {
+  signal?: AbortSignal;
+}
+
+async function postJson<TResponse>(
+  url: string,
+  body: unknown,
+  options: RequestOptions = {}
+): Promise<TResponse> {
   let response: Response;
   try {
     response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: options.signal
     });
-  } catch {
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
     throw new ApiError(0, {
       type: 'about:blank',
       title: 'Network Unreachable',
@@ -38,12 +52,13 @@ async function postJson<TResponse>(url: string, body: unknown): Promise<TRespons
 }
 
 export interface AnalysisClient {
-  analyzeSentiment(text: string): Promise<SentimentAnalysisResult>;
-  analyzeReadability(text: string): Promise<ReadabilityAnalysisResult>;
+  analyzeSentiment(text: string, options?: RequestOptions): Promise<SentimentAnalysisResult>;
+  analyzeReadability(text: string, options?: RequestOptions): Promise<ReadabilityAnalysisResult>;
 }
 
 export const api: AnalysisClient = {
-  analyzeSentiment: (text) => postJson<SentimentAnalysisResult>(endpoints.sentimentAnalyze, { text }),
-  analyzeReadability: (text) =>
-    postJson<ReadabilityAnalysisResult>(endpoints.readabilityAnalyze, { text })
+  analyzeSentiment: (text, options) =>
+    postJson<SentimentAnalysisResult>(endpoints.sentimentAnalyze, { text }, options),
+  analyzeReadability: (text, options) =>
+    postJson<ReadabilityAnalysisResult>(endpoints.readabilityAnalyze, { text }, options)
 };

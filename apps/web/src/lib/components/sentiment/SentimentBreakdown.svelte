@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SentimentAnalysisResult, SentimentCategory } from '@repo/shared-types';
-  import { MetricGauge, StatusBadge } from '$lib/components/ui/index.ts';
+  import { MetricGauge, StatusBadge } from '#lib/components/ui/index.ts';
 
   interface Props {
     result: SentimentAnalysisResult;

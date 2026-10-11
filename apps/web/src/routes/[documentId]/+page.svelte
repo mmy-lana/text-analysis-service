@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PaperCard, StatusBadge } from '$lib/components/ui/index.ts';
+  import { PaperCard, StatusBadge } from '#lib/components/ui/index.ts';
   import type { CompleteAnalysisResponse } from '@repo/shared-types';
 
   interface Props {

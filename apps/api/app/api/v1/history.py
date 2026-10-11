@@ -1,23 +1,25 @@
 """Historical Archive & Persistence Engine.
 
 Asynchronous Turso (LibSQL) repository for persistent report storage with
-pagination, keyword search, deletion, and API-key isolation.
+pagination, keyword search, deletion, and per-identity isolation. Authenticated
+callers are isolated by verified API key hash; anonymous callers are isolated
+by a salted HMAC digest of their client-generated X-Session-ID header, which
+prevents cross-tenant enumeration (SEC-01).
 """
 
 from __future__ import annotations
 
+import re
 import uuid
-from datetime import UTC, datetime
-from typing import Any
+from datetime import datetime, timezone
+from typing import Any, Optional
 
-import libsql_client
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.algorithms.readability_indexes import analyze_readability
 from app.core.algorithms.sentiment_lexicon import analyze_sentiment
-from app.core.security import hash_api_key
 from app.database import Database
-from app.dependencies import get_database
+from app.dependencies import RequestIdentity, get_database, resolve_request_identity
 from app.models.common import AnalysisSubmissionPayload, DocumentTextStatisticsModel
 from app.models.document import (
     CompleteAnalysisResponseModel,
@@ -25,24 +27,27 @@ from app.models.document import (
     PaginatedHistoryModel,
 )
 from app.models.readability import ReadabilityAnalysisResponse
-from app.models.sentiment import SentimentAnalysisResponse
+from app.models.sentiment import EmotionSpectrumModel, SentimentAnalysisResponse
 
 router = APIRouter(prefix="/history", tags=["Historical Archive"])
 
 
-def resolve_api_key_id(request: Request) -> str | None:
-    """Derive the isolation key from the X-API-Key header; None for anonymous."""
-    raw_key = request.headers.get("X-API-Key")
-    if not raw_key:
-        return None
-    return hash_api_key(raw_key)
+def _require_identity(identity: RequestIdentity) -> str:
+    isolation_value = identity.isolation_value
+    if isolation_value is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Archival access requires a verified API key or an X-Session-ID session header."
+            ),
+        )
+    return isolation_value
 
 
 def _compute_statistics(text: str) -> DocumentTextStatisticsModel:
-    import re
-
     paragraphs = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
-    sentences, words = _segment(text)
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    words = re.findall(r"\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b", text)
     return DocumentTextStatisticsModel(
         character_count=len(text),
         word_count=len(words),
@@ -51,16 +56,8 @@ def _compute_statistics(text: str) -> DocumentTextStatisticsModel:
     )
 
 
-def _segment(text: str) -> tuple[list[str], list[str]]:
-    import re
-
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
-    words = re.findall(r"\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b", text)
-    return sentences, words
-
-
-def _sentiment_row_values(document_id: str, result: SentimentAnalysisResponse) -> tuple[Any, ...]:
-    return (
+def _sentiment_row_values(document_id: str, result: SentimentAnalysisResponse) -> list[Any]:
+    return [
         str(uuid.uuid4()),
         document_id,
         result.polarity,
@@ -78,13 +75,11 @@ def _sentiment_row_values(document_id: str, result: SentimentAnalysisResponse) -
         result.emotions.surprise,
         result.emotions.disgust,
         result.emotions.anticipation,
-    )
+    ]
 
 
-def _readability_row_values(
-    document_id: str, result: ReadabilityAnalysisResponse
-) -> tuple[Any, ...]:
-    return (
+def _readability_row_values(document_id: str, result: ReadabilityAnalysisResponse) -> list[Any]:
+    return [
         str(uuid.uuid4()),
         document_id,
         result.flesch_reading_ease,
@@ -99,13 +94,15 @@ def _readability_row_values(
         result.complex_word_count,
         result.grade_level_consensus,
         result.cefr_equivalent.value,
-    )
+    ]
 
 
-def _isolation_clause(api_key_id: str | None) -> tuple[str, list[Any]]:
-    if api_key_id is not None:
-        return "d.api_key_id = ?", [api_key_id]
-    return "d.api_key_id IS NULL", []
+def _isolation_clause(identity: RequestIdentity) -> tuple[str, list[Any]]:
+    """Build the per-tenant WHERE fragment for the documents table."""
+    if identity.is_authenticated:
+        return "d.api_key_id = ?", [identity.api_key_id]
+    assert identity.session_id is not None
+    return "d.session_id = ?", [identity.session_id]
 
 
 @router.post(
@@ -114,14 +111,16 @@ def _isolation_clause(api_key_id: str | None) -> tuple[str, list[Any]]:
     status_code=status.HTTP_201_CREATED,
     summary="Persist Analyzed Document",
     description=(
-        "Runs both engines and stores the document with its sentiment and readability evaluations."
+        "Runs both engines and stores the document with its sentiment and "
+        "readability evaluations, bound to the caller's identity."
     ),
 )
 async def store_document(
     payload: AnalysisSubmissionPayload,
-    api_key_id: str | None = Depends(resolve_api_key_id),
+    identity: RequestIdentity = Depends(resolve_request_identity),
     db: Database = Depends(get_database),
 ) -> CompleteAnalysisResponseModel:
+    _require_identity(identity)
     text = payload.text.strip()
     if not text:
         raise HTTPException(
@@ -135,18 +134,19 @@ async def store_document(
     readability = analyze_readability(text)
 
     document_id = str(uuid.uuid4())
-    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
-    statements = [
+    statements: list[tuple[str, list[Any]]] = [
         (
             (
-                "INSERT INTO documents (id, api_key_id, title, raw_text, character_count, "
-                "word_count, sentence_count, paragraph_count, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO documents (id, api_key_id, session_id, title, raw_text, "
+                "character_count, word_count, sentence_count, paragraph_count, "
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             ),
             [
                 document_id,
-                api_key_id,
+                identity.api_key_id,
+                identity.session_id,
                 title,
                 text,
                 statistics.character_count,
@@ -159,33 +159,30 @@ async def store_document(
         ),
         (
             (
-                "INSERT INTO sentiment_evaluations (id, document_id, polarity, subjectivity, "
-                "classification, positivity_score, negativity_score, neutrality_score, "
-                "compound_score, joy_score, sadness_score, anger_score, fear_score, trust_score, "
-                "surprise_score, disgust_score, anticipation_score) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO sentiment_evaluations (id, document_id, polarity, "
+                "subjectivity, classification, positivity_score, negativity_score, "
+                "neutrality_score, compound_score, joy_score, sadness_score, "
+                "anger_score, fear_score, trust_score, surprise_score, disgust_score, "
+                "anticipation_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             ),
-            list(_sentiment_row_values(document_id, sentiment)),
+            _sentiment_row_values(document_id, sentiment),
         ),
         (
             (
-                "INSERT INTO readability_evaluations (id, document_id, flesch_reading_ease, "
-                "flesch_kincaid_grade, gunning_fog_index, coleman_liau_index, smog_index, "
-                "automated_readability_index, reading_time_seconds, speaking_time_seconds, "
-                "syllable_count, complex_word_count, grade_level_consensus, cefr_equivalent) "
+                "INSERT INTO readability_evaluations (id, document_id, "
+                "flesch_reading_ease, flesch_kincaid_grade, gunning_fog_index, "
+                "coleman_liau_index, smog_index, automated_readability_index, "
+                "reading_time_seconds, speaking_time_seconds, syllable_count, "
+                "complex_word_count, grade_level_consensus, cefr_equivalent) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             ),
-            list(_readability_row_values(document_id, readability)),
+            _readability_row_values(document_id, readability),
         ),
     ]
 
-    if db._client is None:
-        await db.connect()
-    # Transactional batch: a failure in any evaluation insert rolls the whole
-    # archival transaction back, leaving no orphan document row behind.
-    await db._client.batch(  # type: ignore[union-attr]
-        [libsql_client.Statement(sql, args=args) for sql, args in statements]
-    )
+    # Atomic archival: any failure rolls the whole transaction back, leaving
+    # no orphan document row behind.
+    await db.execute_batch(statements)
 
     return CompleteAnalysisResponseModel(
         document_id=document_id,
@@ -193,7 +190,7 @@ async def store_document(
         statistics=statistics,
         sentiment=sentiment,
         readability=readability,
-        processed_at=datetime.now(UTC),
+        processed_at=datetime.now(timezone.utc),
     )
 
 
@@ -201,16 +198,17 @@ async def store_document(
     "",
     response_model=PaginatedHistoryModel,
     summary="List Archived Documents",
-    description="Paginated archive listing with keyword search and API-key isolation.",
+    description="Paginated archive listing with keyword search and identity isolation.",
 )
 async def list_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    search: str | None = Query(default=None, max_length=255),
-    api_key_id: str | None = Depends(resolve_api_key_id),
+    search: Optional[str] = Query(default=None, max_length=255),
+    identity: RequestIdentity = Depends(resolve_request_identity),
     db: Database = Depends(get_database),
 ) -> PaginatedHistoryModel:
-    where, params = _isolation_clause(api_key_id)
+    _require_identity(identity)
+    where, params = _isolation_clause(identity)
     if search:
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         where += " AND (d.title LIKE ? ESCAPE '\\' OR d.raw_text LIKE ? ESCAPE '\\')"
@@ -223,13 +221,15 @@ async def list_history(
 
     offset = (page - 1) * page_size
     rows = await db.execute(
-        "SELECT d.id, d.title, d.word_count, s.classification AS sentiment_classification, "
-        "r.cefr_equivalent AS cefr_equivalent, d.created_at "
-        "FROM documents d "
-        "JOIN sentiment_evaluations s ON s.document_id = d.id "
-        "JOIN readability_evaluations r ON r.document_id = d.id "
-        f"WHERE {where} "
-        "ORDER BY d.created_at DESC LIMIT ? OFFSET ?",
+        (
+            "SELECT d.id, d.title, d.word_count, s.classification AS sentiment_classification, "
+            "r.cefr_equivalent AS cefr_equivalent, d.created_at "
+            "FROM documents d "
+            "JOIN sentiment_evaluations s ON s.document_id = d.id "
+            "JOIN readability_evaluations r ON r.document_id = d.id "
+            f"WHERE {where} "
+            "ORDER BY d.created_at DESC LIMIT ? OFFSET ?"
+        ),
         (*tuple(params), page_size, offset),
     )
 
@@ -248,12 +248,15 @@ async def list_history(
 
 
 async def _fetch_document_or_404(
-    document_id: str, api_key_id: str | None, db: Database
+    isolation_value: str, identity: RequestIdentity, document_id: str, db: Database
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    where, params = _isolation_clause(api_key_id)
+    if identity.is_authenticated:
+        clause, params = "d.api_key_id = ?", [isolation_value]
+    else:
+        clause, params = "d.session_id = ?", [isolation_value]
     rows = await db.execute(
-        f"SELECT d.* FROM documents d WHERE {where} AND d.id = ?",
-        (*tuple(params), document_id),
+        f"SELECT d.* FROM documents d WHERE {clause} AND d.id = ?",
+        (*params, document_id),
     )
     if not rows:
         raise HTTPException(
@@ -277,8 +280,6 @@ async def _fetch_document_or_404(
 
 
 def _sentiment_from_row(row: dict[str, Any]) -> SentimentAnalysisResponse:
-    from app.models.sentiment import EmotionSpectrumModel
-
     emotions = EmotionSpectrumModel(
         joy=row["joy_score"],
         sadness=row["sadness_score"],
@@ -327,11 +328,12 @@ def _readability_from_row(row: dict[str, Any]) -> ReadabilityAnalysisResponse:
 )
 async def fetch_document(
     document_id: str,
-    api_key_id: str | None = Depends(resolve_api_key_id),
+    identity: RequestIdentity = Depends(resolve_request_identity),
     db: Database = Depends(get_database),
 ) -> CompleteAnalysisResponseModel:
+    isolation_value = _require_identity(identity)
     document, sentiment_row, readability_row = await _fetch_document_or_404(
-        document_id, api_key_id, db
+        isolation_value, identity, document_id, db
     )
     return CompleteAnalysisResponseModel(
         document_id=document["id"],
@@ -355,22 +357,17 @@ async def fetch_document(
 )
 async def delete_document(
     document_id: str,
-    api_key_id: str | None = Depends(resolve_api_key_id),
+    identity: RequestIdentity = Depends(resolve_request_identity),
     db: Database = Depends(get_database),
 ) -> None:
-    await _fetch_document_or_404(document_id, api_key_id, db)
-    # Explicit child-first removal; foreign keys cascade in managed Turso,
-    # but an explicit ordered batch keeps semantics deterministic everywhere.
-    if db._client is None:
-        await db.connect()
-    await db._client.batch(  # type: ignore[union-attr]
+    isolation_value = _require_identity(identity)
+    await _fetch_document_or_404(isolation_value, identity, document_id, db)
+    # Explicit child-first removal inside one atomic transaction; foreign key
+    # cascades remain enforced server-side on managed Turso deployments.
+    await db.execute_batch(
         [
-            libsql_client.Statement(
-                "DELETE FROM sentiment_evaluations WHERE document_id = ?", args=[document_id]
-            ),
-            libsql_client.Statement(
-                "DELETE FROM readability_evaluations WHERE document_id = ?", args=[document_id]
-            ),
-            libsql_client.Statement("DELETE FROM documents WHERE id = ?", args=[document_id]),
+            ("DELETE FROM sentiment_evaluations WHERE document_id = ?", [document_id]),
+            ("DELETE FROM readability_evaluations WHERE document_id = ?", [document_id]),
+            ("DELETE FROM documents WHERE id = ?", [document_id]),
         ]
     )

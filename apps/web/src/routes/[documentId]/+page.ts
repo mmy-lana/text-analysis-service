@@ -1,4 +1,4 @@
-import { historyRepository } from '$lib/stores/historyStore.svelte.ts';
+import { historyRepository } from '#lib/stores/historyStore.svelte.ts';
 import type { CompleteAnalysisResponse } from '@repo/shared-types';
 
 export const load = async ({

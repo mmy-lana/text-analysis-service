@@ -48,46 +48,61 @@ class TestTokenization:
 
 class TestSentimentVector:
     def test_empty_tokens_are_neutral(self) -> None:
-        polarity, subjectivity, pos, neu, neg = evaluate_sentiment_vector([])
-        assert polarity == 0.0
-        assert subjectivity == 0.0
-        assert pos == 0.0
-        assert neu == 1.0
-        assert neg == 0.0
+        vector = evaluate_sentiment_vector([])
+        assert vector.polarity == 0.0
+        assert vector.subjectivity == 0.0
+        assert vector.positivity == 0.0
+        assert vector.neutrality == 1.0
+        assert vector.negativity == 0.0
+        assert vector.is_divergent is False
 
     def test_positive_text_yields_positive_polarity(self) -> None:
-        polarity, *_ = evaluate_sentiment_vector(tokenize("A brilliant masterpiece"))
-        assert 0.1 <= polarity <= 1.0
+        vector = evaluate_sentiment_vector(tokenize("A brilliant masterpiece"))
+        assert 0.1 <= vector.polarity <= 1.0
+        assert vector.is_divergent is False
 
     def test_negative_text_yields_negative_polarity(self) -> None:
-        polarity, *_ = evaluate_sentiment_vector(tokenize("A horrific catastrophic disaster"))
-        assert polarity < -0.5
+        vector = evaluate_sentiment_vector(tokenize("A horrific catastrophic disaster"))
+        assert vector.polarity < -0.5
 
     def test_neutral_text(self) -> None:
-        polarity, subjectivity, pos, neu, neg = evaluate_sentiment_vector(
-            tokenize("the table sat quietly near the wall")
-        )
-        assert polarity == 0.0
-        assert subjectivity == 0.0
-        assert pos == 0.0
-        assert neu == 1.0
-        assert neg == 0.0
+        vector = evaluate_sentiment_vector(tokenize("the table sat quietly near the wall"))
+        assert vector.polarity == 0.0
+        assert vector.subjectivity == 0.0
+        assert vector.positivity == 0.0
+        assert vector.neutrality == 1.0
+        assert vector.negativity == 0.0
+
+    def test_objective_tokens_contribute_to_neutrality(self) -> None:
+        # "brilliant" plus 3 objective words: neutrality reflects the
+        # un-scored token share instead of collapsing to zero.
+        vector = evaluate_sentiment_vector(tokenize("brilliant and the table"))
+        assert 0.0 < vector.neutrality < 1.0
+        assert vector.positivity > 0.0
+        assert vector.neutrality + vector.positivity + vector.negativity == pytest.approx(1.0)
+
+    def test_divergent_polarity_detected_on_cancellation(self) -> None:
+        vector = evaluate_sentiment_vector(tokenize("brilliant terrible"))
+        assert vector.positivity > 0.0
+        assert vector.negativity > 0.0
+        assert abs(vector.polarity) < 0.1
+        assert vector.is_divergent is True
 
     def test_negation_flips_polarity(self) -> None:
-        plain, *_ = evaluate_sentiment_vector(tokenize("brilliant"))
-        negated, *_ = evaluate_sentiment_vector(tokenize("not brilliant"))
-        assert plain > 0
-        assert negated < 0
+        plain = evaluate_sentiment_vector(tokenize("brilliant"))
+        negated = evaluate_sentiment_vector(tokenize("not brilliant"))
+        assert plain.polarity > 0
+        assert negated.polarity < 0
 
     def test_intensifier_amplifies(self) -> None:
-        plain, *_ = evaluate_sentiment_vector(tokenize("good"))
-        amplified, *_ = evaluate_sentiment_vector(tokenize("very good"))
-        assert amplified > plain
+        plain = evaluate_sentiment_vector(tokenize("good"))
+        amplified = evaluate_sentiment_vector(tokenize("very good"))
+        assert amplified.polarity > plain.polarity
 
     def test_polarity_is_bounded(self) -> None:
         tokens = tokenize(" ".join(["brilliant"] * 500))
-        polarity, *_ = evaluate_sentiment_vector(tokens)
-        assert -1.0 <= polarity <= 1.0
+        vector = evaluate_sentiment_vector(tokens)
+        assert -1.0 <= vector.polarity <= 1.0
 
 
 class TestClassification:
@@ -241,3 +256,24 @@ class TestSentimentEndpoints:
     def test_batch_rejects_more_than_fifty(self, client: TestClient) -> None:
         response = client.post("/api/v1/sentiment/batch", json={"texts": ["ok"] * 51})
         assert response.status_code == 422
+
+
+class TestDivergenceContract:
+    def test_response_exposes_camel_case_is_divergent(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/sentiment/analyze",
+            json={"text": "brilliant terrible"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["isDivergent"] is True
+        assert body["neutralityScore"] >= 0.0
+        assert body["positivityScore"] + body["negativityScore"] + body["neutralityScore"] <= 1.001
+
+    def test_single_valence_text_is_not_divergent(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/sentiment/analyze",
+            json={"text": "A brilliant masterpiece of delight."},
+        )
+        assert response.status_code == 200
+        assert response.json()["isDivergent"] is False

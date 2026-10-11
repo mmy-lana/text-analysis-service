@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ReadabilityAnalysisResult } from '@repo/shared-types';
-  import { MetricGauge } from '$lib/components/ui/index.ts';
+  import { MetricGauge } from '#lib/components/ui/index.ts';
 
   interface Props {
     result: ReadabilityAnalysisResult;

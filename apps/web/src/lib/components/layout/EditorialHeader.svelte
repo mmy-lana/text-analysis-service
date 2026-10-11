@@ -1,9 +1,13 @@
 <script lang="ts">
+  import EditorialGuideModal from './EditorialGuideModal.svelte';
+
   interface Props {
     current?: 'workbench' | 'archive';
   }
 
   let { current = 'workbench' }: Props = $props();
+
+  let guideOpen = $state(false);
 
   const links = [
     { href: '/', label: 'Workbench', key: 'workbench' },
@@ -34,9 +38,16 @@
           {link.label}
         </a>
       {/each}
-      <span class="hidden sm:inline-block font-mono text-xs text-ink-700 border border-paper-300 px-3 py-2 bg-paper-50 ml-1">
-        API Edition 1.0
-      </span>
+      <button
+        type="button"
+        onclick={() => (guideOpen = true)}
+        class="min-h-[44px] min-w-[44px] inline-flex items-center justify-center px-4 font-mono text-xs uppercase tracking-wider border bg-cobalt-surface text-cobalt-base border-cobalt-border"
+        aria-haspopup="dialog"
+      >
+        Field Guide
+      </button>
     </nav>
   </div>
 </header>
+
+<EditorialGuideModal open={guideOpen} onclose={() => (guideOpen = false)} />

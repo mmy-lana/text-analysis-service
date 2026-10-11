@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE TABLE IF NOT EXISTS documents (
     id TEXT PRIMARY KEY,
     api_key_id TEXT,
+    session_id TEXT,
     title TEXT NOT NULL,
     raw_text TEXT NOT NULL,
     character_count INTEGER NOT NULL,
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS readability_evaluations (
 CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);
 CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_documents_api_key_id ON documents(api_key_id);
+CREATE INDEX IF NOT EXISTS idx_documents_session_id ON documents(session_id);
 CREATE INDEX IF NOT EXISTS idx_sentiment_evaluations_document_id ON sentiment_evaluations(document_id);
 CREATE INDEX IF NOT EXISTS idx_sentiment_classification ON sentiment_evaluations(classification);
 CREATE INDEX IF NOT EXISTS idx_readability_evaluations_document_id ON readability_evaluations(document_id);

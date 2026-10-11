@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import '../app.css';
-  import EditorialHeader from '$lib/components/layout/EditorialHeader.svelte';
-  import EditorialFooter from '$lib/components/layout/EditorialFooter.svelte';
+  import EditorialHeader from '#lib/components/layout/EditorialHeader.svelte';
+  import EditorialFooter from '#lib/components/layout/EditorialFooter.svelte';
 
   let { children }: { children: Snippet } = $props();
 </script>

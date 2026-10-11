@@ -41,6 +41,7 @@ export interface SentimentAnalysisResult {
   negativityScore: number;
   neutralityScore: number;
   compoundScore: number;
+  isDivergent: boolean;
   emotions: EmotionSpectrum;
 }
 

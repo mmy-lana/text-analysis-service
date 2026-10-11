@@ -1,18 +1,37 @@
-"""Cryptographic API key utilities for rate-limit governance and isolation."""
+"""Cryptographic API key utilities for rate-limit governance and isolation.
+
+Key material is never stored in plaintext: raw API keys and anonymous session
+identifiers are reduced to keyed HMAC-SHA-256 digests using the mandatory
+API_KEY_SALT provisioned through application settings.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 
-# Rotating salt; in production this is provisioned via the environment.
-_SALT_ROTATION = os.environ.get("API_KEY_SALT", "text-analysis-service-v1")
+from app.config import settings
+
+
+def _hmac_digest(value: str) -> str:
+    return hmac.new(
+        settings.api_key_salt.encode("utf-8"), value.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 def hash_api_key(raw_key: str) -> str:
-    """SHA-256 hash of the raw API key combined with the rotating salt."""
-    return hashlib.sha256(f"{_SALT_ROTATION}:{raw_key}".encode()).hexdigest()
+    """Keyed HMAC-SHA-256 digest of a raw API key."""
+    return _hmac_digest(raw_key)
+
+
+def hash_session_id(session_id: str) -> str:
+    """Keyed HMAC-SHA-256 digest of a client session identifier."""
+    return _hmac_digest(f"session:{session_id}")
+
+
+def hash_client_ip(client_ip: str) -> str:
+    """Keyed HMAC-SHA-256 digest of a client IP for anonymous rate limiting."""
+    return _hmac_digest(f"ip:{client_ip}")
 
 
 def verify_api_key(raw_key: str, key_hash: str) -> bool:

@@ -1,8 +1,9 @@
 """Integration tests for the Historical Archive & Persistence Engine.
 
 Runs against a real SQLite database file through the same async LibSQL client
-facade used in production, verifying transactions, rollbacks, and cascading
-removal semantics."""
+facade used in production, verifying transactions, rollbacks, cascading
+removal semantics, and per-identity isolation (verified API keys vs. anonymous
+X-Session-ID sessions)."""
 
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import libsql_client
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.security import hash_api_key
 from app.database import Database
 from app.dependencies import get_database
 from app.main import app
@@ -21,6 +23,10 @@ from app.main import app
 SCHEMA_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "docker", "sqld", "init.sql"
 )
+
+SESSION_A = "aaaaaaaa-1111-2222-3333-444444444444"
+SESSION_B = "bbbbbbbb-1111-2222-3333-444444444444"
+VALID_KEY = "test-runner-key-0001"
 
 
 def _run(coro):
@@ -32,7 +38,7 @@ def db() -> Database:
     database = Database()
     handle, path = tempfile.mkstemp(suffix=".db")
     os.close(handle)
-    database._client = libsql_client.create_client(url=f"file:{path}")
+    _run(database.bind_client(f"file:{path}"))
 
     with open(os.path.abspath(SCHEMA_PATH), "r", encoding="utf-8") as schema_file:
         statements = [
@@ -40,7 +46,20 @@ def db() -> Database:
             for stmt in schema_file.read().split(";")
             if stmt.strip() and not stmt.strip().startswith("PRAGMA")
         ]
-    _run(database._client.batch([libsql_client.Statement(stmt) for stmt in statements]))  # type: ignore[union-attr]
+    _run(
+        database._client.batch([libsql_client.Statement(stmt) for stmt in statements])  # type: ignore[union-attr]
+    )
+    # Register the verification test key.
+    _run(
+        database._client.batch(  # type: ignore[union-attr]
+            [
+                libsql_client.Statement(
+                    "INSERT OR IGNORE INTO api_keys (id, key_hash, owner_name) VALUES (?, ?, ?)",
+                    args=["key-test-1", hash_api_key(VALID_KEY), "Test Runner"],
+                )
+            ]
+        )
+    )
     yield database
     _run(database.disconnect())
     os.unlink(path)
@@ -54,25 +73,52 @@ def client(db: Database) -> TestClient:
     app.dependency_overrides.clear()
 
 
+def _headers(session: str) -> dict[str, str]:
+    return {"X-Session-ID": session}
+
+
+def _store(client: TestClient, payload: dict, headers: dict[str, str]) -> dict:
+    response = client.post("/api/v1/history", json=payload, headers=headers)
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 STORED_PAYLOADS = [
     {"title": "Joyful Reflections", "text": "A brilliant masterpiece of delight and peace."},
     {"title": "Dark Warnings", "text": "A horrific catastrophic disaster of grief and dread."},
 ]
 
 
-def _store(client: TestClient, payload: dict) -> dict:
-    response = client.post("/api/v1/history", json=payload)
-    assert response.status_code == 201, response.text
-    return response.json()
+class TestIdentityEnforcement:
+    def test_unidentified_callers_are_refused(self, client: TestClient) -> None:
+        response = client.get("/api/v1/history")
+        assert response.status_code == 401
+        assert "X-Session-ID" in response.json()["detail"]
+
+        store_response = client.post("/api/v1/history", json=STORED_PAYLOADS[0])
+        assert store_response.status_code == 401
+
+    def test_invalid_api_key_is_rejected(self, client: TestClient) -> None:
+        response = client.get("/api/v1/history", headers={"X-API-Key": "bogus-key-not-registered"})
+        assert response.status_code == 401
+        assert "revoked" in response.json()["detail"]
+
+    def test_valid_api_key_is_accepted(self, client: TestClient) -> None:
+        response = client.get("/api/v1/history", headers={"X-API-Key": VALID_KEY})
+        assert response.status_code == 200
+
+    def test_short_session_ids_are_treated_as_unidentified(self, client: TestClient) -> None:
+        response = client.get("/api/v1/history", headers={"X-Session-ID": "abc"})
+        assert response.status_code == 401
 
 
 class TestPersistence:
-    def test_store_and_fetch_document(self, client: TestClient) -> None:
-        stored = _store(client, STORED_PAYLOADS[0])
+    def test_store_and_fetch_document_with_session(self, client: TestClient) -> None:
+        stored = _store(client, STORED_PAYLOADS[0], _headers(SESSION_A))
         assert stored["documentId"] is not None
         assert stored["statistics"]["wordCount"] > 0
 
-        fetched = client.get(f"/api/v1/history/{stored['documentId']}")
+        fetched = client.get(f"/api/v1/history/{stored['documentId']}", headers=_headers(SESSION_A))
         assert fetched.status_code == 200
         body = fetched.json()
         assert body["title"] == "Joyful Reflections"
@@ -81,42 +127,97 @@ class TestPersistence:
 
     def test_pagination_and_search(self, client: TestClient) -> None:
         for payload in STORED_PAYLOADS:
-            _store(client, payload)
+            _store(client, payload, _headers(SESSION_A))
 
-        listing = client.get("/api/v1/history?page=1&page_size=1")
+        listing = client.get(
+            "/api/v1/history", params={"page": 1, "page_size": 1}, headers=_headers(SESSION_A)
+        )
         assert listing.status_code == 200
         body = listing.json()
         assert body["pageSize"] == 1
         assert body["total"] >= 2
         assert len(body["items"]) == 1
 
-        searched = client.get("/api/v1/history", params={"search": "Dark Warnings"})
+        searched = client.get(
+            "/api/v1/history", params={"search": "Dark Warnings"}, headers=_headers(SESSION_A)
+        )
         assert searched.status_code == 200
         assert all("Dark Warnings" == item["title"] for item in searched.json()["items"])
 
-        searched_fragment = client.get("/api/v1/history", params={"search": "brilliant"})
+        searched_fragment = client.get(
+            "/api/v1/history", params={"search": "brilliant"}, headers=_headers(SESSION_A)
+        )
         assert searched_fragment.status_code == 200
         assert searched_fragment.json()["total"] >= 1
 
-        no_hits = client.get("/api/v1/history", params={"search": "zzznotfoundzzz"})
+        no_hits = client.get(
+            "/api/v1/history", params={"search": "zzznotfoundzzz"}, headers=_headers(SESSION_A)
+        )
         assert no_hits.json()["total"] == 0
 
-    def test_delete_is_idempotent_not_found(self, client: TestClient) -> None:
-        response = client.delete("/api/v1/history/does-not-exist")
+    def test_delete_unknown_document_returns_problem_details(self, client: TestClient) -> None:
+        response = client.delete("/api/v1/history/does-not-exist", headers=_headers(SESSION_A))
         assert response.status_code == 404
-        problem = response.json()
-        assert problem["title"] == "Request Failed"
+        assert response.json()["title"] == "Request Failed"
+
+
+class TestTenantIsolation:
+    def test_sessions_cannot_enumerate_each_other(self, client: TestClient) -> None:
+        stored = _store(client, STORED_PAYLOADS[0], _headers(SESSION_A))
+        document_id = stored["documentId"]
+
+        other_session_list = client.get("/api/v1/history", headers=_headers(SESSION_B))
+        assert all(item["id"] != document_id for item in other_session_list.json()["items"])
+
+        other_session_fetch = client.get(
+            f"/api/v1/history/{document_id}", headers=_headers(SESSION_B)
+        )
+        assert other_session_fetch.status_code == 404
+
+        other_session_delete = client.delete(
+            f"/api/v1/history/{document_id}", headers=_headers(SESSION_B)
+        )
+        assert other_session_delete.status_code == 404
+
+    def test_anonymous_documents_are_invisible_without_session(self, client: TestClient) -> None:
+        stored = _store(client, STORED_PAYLOADS[1], _headers(SESSION_A))
+        # Without any session header the caller is refused outright.
+        bare_fetch = client.get(f"/api/v1/history/{stored['documentId']}")
+        assert bare_fetch.status_code == 401
+
+        bare_list = client.get("/api/v1/history")
+        assert bare_list.status_code == 401
+
+    def test_keyed_tenancy_is_separate_from_sessions(self, client: TestClient) -> None:
+        keyed_store = client.post(
+            "/api/v1/history",
+            json={"title": "Keyed Document", "text": "Simple plain words."},
+            headers={"X-API-Key": VALID_KEY},
+        )
+        assert keyed_store.status_code == 201
+        document_id = keyed_store.json()["documentId"]
+
+        session_list = client.get("/api/v1/history", headers=_headers(SESSION_A))
+        assert all(item["id"] != document_id for item in session_list.json()["items"])
+
+        keyed_fetch = client.get(f"/api/v1/history/{document_id}", headers={"X-API-Key": VALID_KEY})
+        assert keyed_fetch.status_code == 200
+
+        keyed_delete = client.delete(
+            f"/api/v1/history/{document_id}", headers={"X-API-Key": VALID_KEY}
+        )
+        assert keyed_delete.status_code == 204
 
 
 class TestTransactionsAndRollback:
     def test_rollback_on_evaluation_failure(self, client: TestClient, db: Database) -> None:
-
         # Force the second statement to violate the CEFR CHECK constraint so
         # the whole archival batch rolls back, leaving no orphan document.
         statements = [
             libsql_client.Statement(
-                "INSERT INTO documents (id, api_key_id, title, raw_text, character_count, "
-                "word_count, sentence_count, paragraph_count) VALUES (?, NULL, ?, ?, 10, 2, 1, 1)",
+                "INSERT INTO documents (id, api_key_id, session_id, title, raw_text, "
+                "character_count, word_count, sentence_count, paragraph_count) "
+                "VALUES (?, NULL, NULL, ?, ?, 10, 2, 1, 1)",
                 args=["rollback-doc-id", "Orphan Probe", "probe text"],
             ),
             libsql_client.Statement(
@@ -129,14 +230,13 @@ class TestTransactionsAndRollback:
             ),
         ]
         with pytest.raises(libsql_client.LibsqlError):
-            _run(db._client.batch(statements))  # type: ignore[union-attr]
+            _run(db.execute_batch([(s.sql, list(s.args or [])) for s in statements]))  # type: ignore[union-attr]
 
-        response = client.get("/api/v1/history/rollback-doc-id")
+        response = client.get("/api/v1/history/rollback-doc-id", headers=_headers(SESSION_A))
         assert response.status_code == 404  # document insert was rolled back
 
     def test_foreign_key_cascading_removal(self, client: TestClient, db: Database) -> None:
-
-        stored = _store(client, STORED_PAYLOADS[1])
+        stored = _store(client, STORED_PAYLOADS[1], _headers(SESSION_A))
         document_id = stored["documentId"]
 
         rows = _run(
@@ -147,7 +247,9 @@ class TestTransactionsAndRollback:
         )
         assert rows[0]["n"] == 1
 
-        delete_response = client.delete(f"/api/v1/history/{document_id}")
+        delete_response = client.delete(
+            f"/api/v1/history/{document_id}", headers=_headers(SESSION_A)
+        )
         assert delete_response.status_code == 204
 
         remaining_docs = _run(
@@ -168,36 +270,3 @@ class TestTransactionsAndRollback:
         assert remaining_docs[0]["n"] == 0
         assert remaining_sentiment[0]["n"] == 0
         assert remaining_readability[0]["n"] == 0
-
-
-class TestApiKeyIsolation:
-    def test_documents_are_isolated_by_api_key(self, client: TestClient) -> None:
-        keyed_store = client.post(
-            "/api/v1/history",
-            json={"title": "Keyed Document", "text": "Simple plain words."},
-            headers={"X-API-Key": "secret-key-123"},
-        )
-        assert keyed_store.status_code == 201
-        document_id = keyed_store.json()["documentId"]
-
-        anon_list = client.get("/api/v1/history")
-        assert all(item["title"] != "Keyed Document" for item in anon_list.json()["items"])
-
-        keyed_list = client.get("/api/v1/history", headers={"X-API-Key": "secret-key-123"})
-        assert any(item["title"] == "Keyed Document" for item in keyed_list.json()["items"])
-
-        other_key = client.get("/api/v1/history", headers={"X-API-Key": "different-key"})
-        assert all(item["title"] != "Keyed Document" for item in other_key.json()["items"])
-
-        anon_fetch = client.get(f"/api/v1/history/{document_id}")
-        assert anon_fetch.status_code == 404
-
-        keyed_fetch = client.get(
-            f"/api/v1/history/{document_id}", headers={"X-API-Key": "secret-key-123"}
-        )
-        assert keyed_fetch.status_code == 200
-
-        keyed_delete = client.delete(
-            f"/api/v1/history/{document_id}", headers={"X-API-Key": "secret-key-123"}
-        )
-        assert keyed_delete.status_code == 204

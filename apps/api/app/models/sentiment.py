@@ -32,6 +32,12 @@ class SentimentAnalysisResponse(BaseSchema):
     negativity_score: float = Field(ge=0.0, le=1.0)
     neutrality_score: float = Field(ge=0.0, le=1.0)
     compound_score: float = Field(ge=-1.0, le=1.0)
+    is_divergent: bool = Field(
+        default=False,
+        description=(
+            "True when opposing strong emotional terms cancel to an ambiguous compound near zero."
+        ),
+    )
     emotions: EmotionSpectrumModel
     sentence_breakdown: list[SentenceSentimentItem]
 

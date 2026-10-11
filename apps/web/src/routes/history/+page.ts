@@ -1,5 +1,5 @@
-import { historyRepository } from '$lib/stores/historyStore.svelte.ts';
-import type { HistoryFetchResult } from '$lib/stores/historyStore.svelte.ts';
+import { historyRepository } from '#lib/stores/historyStore.svelte.ts';
+import type { HistoryFetchResult } from '#lib/stores/historyStore.svelte.ts';
 
 export const load = async ({ url }: { url: URL }): Promise<{ archive: HistoryFetchResult }> => {
   const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);

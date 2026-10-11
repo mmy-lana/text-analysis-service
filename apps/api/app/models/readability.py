@@ -1,3 +1,5 @@
+from typing import Annotated, List
+
 from pydantic import Field
 
 from app.models.common import BaseSchema, CEFREquivalentEnum
@@ -30,3 +32,13 @@ class ReadabilityAnalysisResponse(BaseSchema):
     grade_level_consensus: str
     cefr_equivalent: CEFREquivalentEnum
     sentence_breakdown: list[SentenceComplexityModel]
+
+
+class ReadabilityBatchRequest(BaseSchema):
+    texts: List[Annotated[str, Field(min_length=1, max_length=100000)]] = Field(
+        min_length=1, max_length=50
+    )
+
+
+class ReadabilityBatchResponse(BaseSchema):
+    results: List[ReadabilityAnalysisResponse]

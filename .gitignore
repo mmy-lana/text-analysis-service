@@ -52,3 +52,10 @@ repomix-output.xml.pycache/
 .pnpm-home/
 .uvcache/
 .vercel/
+
+repomix-output.xml.playwright-browsers/
+test-results/
+.playwright-browsers/
+test-results/
+.buildx/
+repomix-output.xml

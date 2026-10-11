@@ -183,3 +183,23 @@ class TestReadabilityEndpoint:
     def test_oversized_text_rejected(self, client: TestClient) -> None:
         response = client.post("/api/v1/readability/analyze", json={"text": "word " * 30000})
         assert response.status_code == 422
+
+
+class TestReadabilityBatchEndpoint:
+    def test_batch_endpoint_returns_results(self, client: TestClient) -> None:
+        response = client.post(
+            "/api/v1/readability/batch",
+            json={"texts": [SIMPLE_REFERENCE, SMOG_REFERENCE]},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["results"]) == 2
+        assert body["results"][0]["fleschReadingEase"] > 90.0
+
+    def test_batch_rejects_empty_list(self, client: TestClient) -> None:
+        response = client.post("/api/v1/readability/batch", json={"texts": []})
+        assert response.status_code == 422
+
+    def test_batch_rejects_more_than_fifty(self, client: TestClient) -> None:
+        response = client.post("/api/v1/readability/batch", json={"texts": ["ok"] * 51})
+        assert response.status_code == 422

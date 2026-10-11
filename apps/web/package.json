@@ -22,6 +22,11 @@
     "svelte-check": "latest",
     "tailwindcss": "latest",
     "typescript": "~5.9.3",
-    "vite": "latest"
+    "vite": "latest",
+    "@playwright/test": "^1.49.0"
+  },
+  "imports": {
+    "#lib": "./src/lib",
+    "#lib/*": "./src/lib/*"
   }
 }

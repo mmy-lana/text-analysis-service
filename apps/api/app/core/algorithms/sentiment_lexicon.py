@@ -1,5 +1,6 @@
 import math
 import re
+from dataclasses import dataclass
 
 from app.models.common import SentimentClassificationEnum
 from app.models.sentiment import (
@@ -110,9 +111,23 @@ def tokenize(sentence: str) -> list[str]:
     return re.findall(r"\b[a-zA-Z]+\b", sentence.lower())
 
 
-def evaluate_sentiment_vector(tokens: list[str]) -> tuple[float, float, float, float, float]:
+@dataclass(frozen=True)
+class SentimentVector:
+    """Aggregated lexical valence measures for a token stream."""
+
+    polarity: float
+    subjectivity: float
+    positivity: float
+    neutrality: float
+    negativity: float
+    # True when opposing strong emotional terms cancel out to an ambiguous
+    # compound near zero despite clear subjective content on both sides.
+    is_divergent: bool
+
+
+def evaluate_sentiment_vector(tokens: list[str]) -> SentimentVector:
     if not tokens:
-        return 0.0, 0.0, 0.0, 1.0, 0.0
+        return SentimentVector(0.0, 0.0, 0.0, 1.0, 0.0, False)
 
     pos_accum = 0.0
     neg_accum = 0.0
@@ -147,17 +162,32 @@ def evaluate_sentiment_vector(tokens: list[str]) -> tuple[float, float, float, f
     subjectivity = min(1.0, (subjectivity_hits * 1.5) / max(total_tokens, 1))
 
     if total_val == 0.0:
-        return 0.0, subjectivity, 0.0, 1.0, 0.0
+        # Fully objective content: every token is un-scored.
+        return SentimentVector(0.0, subjectivity, 0.0, 1.0, 0.0, False)
+
+    # Objective (un-scored) tokens contribute to the neutrality share so the
+    # tri-partition positivity + negativity + neutrality stays meaningful.
+    objective_share = (total_tokens - subjectivity_hits) / total_tokens
 
     pos_ratio = pos_accum / total_val
     neg_ratio = neg_accum / total_val
-    neu_ratio = 0.0
+    # Normalize subjective mass into [0, 1 - objective_share].
+    subjective_mass = 1.0 - objective_share
 
     diff = pos_accum - neg_accum
     compound = diff / math.sqrt((diff * diff) + 15.0)
     polarity = max(-1.0, min(1.0, compound))
 
-    return polarity, subjectivity, pos_ratio, neu_ratio, neg_ratio
+    divergent = pos_accum > 0.0 and neg_accum > 0.0 and abs(compound) < 0.1
+
+    return SentimentVector(
+        polarity=polarity,
+        subjectivity=subjectivity,
+        positivity=round(subjective_mass * pos_ratio, 4),
+        neutrality=round(objective_share, 4),
+        negativity=round(subjective_mass * neg_ratio, 4),
+        is_divergent=divergent,
+    )
 
 
 def evaluate_emotions(text: str) -> EmotionSpectrumModel:
@@ -195,31 +225,32 @@ def analyze_sentiment(text: str) -> SentimentAnalysisResponse:
     sentence_items: list[SentenceSentimentItem] = []
 
     all_tokens = tokenize(text)
-    polarity, subjectivity, pos_score, neu_score, neg_score = evaluate_sentiment_vector(all_tokens)
+    vector = evaluate_sentiment_vector(all_tokens)
 
     for idx, s_text in enumerate(sentences):
         s_tokens = tokenize(s_text)
-        s_pol, s_subj, _, _, _ = evaluate_sentiment_vector(s_tokens)
+        s_vector = evaluate_sentiment_vector(s_tokens)
         sentence_items.append(
             SentenceSentimentItem(
                 index=idx,
                 text=s_text,
-                polarity=round(s_pol, 4),
-                subjectivity=round(s_subj, 4),
-                classification=classify_polarity(s_pol),
+                polarity=round(s_vector.polarity, 4),
+                subjectivity=round(s_vector.subjectivity, 4),
+                classification=classify_polarity(s_vector.polarity),
             )
         )
 
     emotions = evaluate_emotions(text)
 
     return SentimentAnalysisResponse(
-        polarity=round(polarity, 4),
-        subjectivity=round(subjectivity, 4),
-        classification=classify_polarity(polarity),
-        positivity_score=round(pos_score, 4),
-        negativity_score=round(neg_score, 4),
-        neutrality_score=round(neu_score, 4),
-        compound_score=round(polarity, 4),
+        polarity=round(vector.polarity, 4),
+        subjectivity=round(vector.subjectivity, 4),
+        classification=classify_polarity(vector.polarity),
+        positivity_score=round(vector.positivity, 4),
+        negativity_score=round(vector.negativity, 4),
+        neutrality_score=round(vector.neutrality, 4),
+        compound_score=round(vector.polarity, 4),
+        is_divergent=vector.is_divergent,
         emotions=emotions,
         sentence_breakdown=sentence_items,
     )
