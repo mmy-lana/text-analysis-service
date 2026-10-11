@@ -84,7 +84,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._store = store or WindowStore()
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if request.url.path in self.EXEMPT_PATHS:
+        if request.method == "OPTIONS" or request.url.path in self.EXEMPT_PATHS:
             return await call_next(request)
 
         raw_key = request.headers.get("X-API-Key")

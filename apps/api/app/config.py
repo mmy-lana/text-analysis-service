@@ -7,7 +7,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     cors_origins: list[str] = [
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:4173",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
     ]
     # Cryptographic salt for HMAC-based key and session hashing. Required in
     # production; a development-only fallback is derived at import time.

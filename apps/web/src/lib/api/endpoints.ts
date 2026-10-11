@@ -3,7 +3,7 @@
 // environment namespace; the Vite dev proxy handles same-origin /api
 // requests when PUBLIC_API_BASE_URL is unset.
 export const API_BASE_URL: string =
-  import.meta.env.PUBLIC_API_BASE_URL || 'http://localhost:8000';
+  import.meta.env.PUBLIC_API_BASE_URL ?? '';
 
 export const endpoints = {
   sentimentAnalyze: `${API_BASE_URL}/api/v1/sentiment/analyze`,
