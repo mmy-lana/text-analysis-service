@@ -6,13 +6,13 @@
   - [x] Scaffold `apps/api` with Python toolchain (`pyproject.toml`), asynchronous database connector, and lifespan events.
   - [x] Scaffold `apps/web` with SvelteKit, Vite, and strict TypeScript compilation targets.
 
-- [ ] Task 2: Core design system primitives and atomic UI components
-  - [ ] Configure Tailwind CSS v4 in `apps/web/src/app.css` using the `@theme` directive with editorial serif palette.
-  - [ ] Build atomic component `EditorialButton.svelte` with full tactile paper-pressed states and min 44x44px touch targets.
-  - [ ] Build atomic component `EditorialTextarea.svelte` supporting auto-resizing, line-height matching, and status footer.
-  - [ ] Build atomic component `PaperCard.svelte` with deckle-edge borders, newsprint surface shadows, and padding scales.
-  - [ ] Build atomic component `MetricGauge.svelte` using pure SVG arc rendering without external animation bloat.
-  - [ ] Build atomic component `StatusBadge.svelte` supporting informational, positive, warning, and critical ink-wash variants.
+- [x] Task 2: Core design system primitives and atomic UI components
+  - [x] Configure Tailwind CSS v4 in `apps/web/src/app.css` using the `@theme` directive with editorial serif palette.
+  - [x] Build atomic component `EditorialButton.svelte` with full tactile paper-pressed states and min 44x44px touch targets.
+  - [x] Build atomic component `EditorialTextarea.svelte` supporting auto-resizing, line-height matching, and status footer.
+  - [x] Build atomic component `PaperCard.svelte` with deckle-edge borders, newsprint surface shadows, and padding scales.
+  - [x] Build atomic component `MetricGauge.svelte` using pure SVG arc rendering without external animation bloat.
+  - [x] Build atomic component `StatusBadge.svelte` supporting informational, positive, warning, and critical ink-wash variants.
 
 - [ ] Task 3: Feature Module 1 (Sentiment Analysis Engine) end-to-end implementation
   - [ ] Implement pure Python algorithmic analyzer `sentiment_lexicon.py` computing polarity, subjectivity, and Plutchik emotion spectra.
