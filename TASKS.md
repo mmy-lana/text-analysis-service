@@ -22,13 +22,13 @@
   - [x] Build frontend sentiment visualization components `SentimentBreakdown.svelte` and `EmotionSpectrum.svelte`.
   - [x] Wire SvelteKit client API service to dispatch analysis requests and bind results to reactive state stores.
 
-- [ ] Task 4: Feature Module 2 (Readability & Linguistic Complexity Engine) end-to-end implementation
-  - [ ] Implement English syllable counting heuristic engine in `syllables.py` handling dipthongs, silent endings, and suffixes.
-  - [ ] Implement readability metrics in `readability_indexes.py` calculating Flesch-Kincaid, Gunning Fog, Coleman-Liau, SMOG, and ARI.
-  - [ ] Define Pydantic schemas in `apps/api/app/models/readability.py` including sentence-level complexity decomposition.
-  - [ ] Implement async router `apps/api/app/api/v1/readability.py` with complete validation and benchmark grading classifications.
-  - [ ] Write pytest test suite `apps/api/tests/test_readability.py` validating metrics against standardized literary reference passages.
-  - [ ] Build frontend readability UI `GradeBandCard.svelte`, `MetricGrid.svelte`, and `SentenceHighlighter.svelte`.
+- [x] Task 4: Feature Module 2 (Readability & Linguistic Complexity Engine) end-to-end implementation
+  - [x] Implement English syllable counting heuristic engine in `syllables.py` handling dipthongs, silent endings, and suffixes.
+  - [x] Implement readability metrics in `readability_indexes.py` calculating Flesch-Kincaid, Gunning Fog, Coleman-Liau, SMOG, and ARI.
+  - [x] Define Pydantic schemas in `apps/api/app/models/readability.py` including sentence-level complexity decomposition.
+  - [x] Implement async router `apps/api/app/api/v1/readability.py` with complete validation and benchmark grading classifications.
+  - [x] Write pytest test suite `apps/api/tests/test_readability.py` validating metrics against standardized literary reference passages.
+  - [x] Build frontend readability UI `GradeBandCard.svelte`, `MetricGrid.svelte`, and `SentenceHighlighter.svelte`.
 
 - [ ] Task 5: Feature Module 3 (Historical Archive & Persistence Engine) end-to-end implementation
   - [ ] Implement asynchronous Turso database repository in `apps/api/app/api/v1/history.py` for persistent report storage.

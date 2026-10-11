@@ -2,40 +2,11 @@ import math
 import re
 from typing import List, Tuple
 from app.models.common import CEFREquivalentEnum
+from app.core.algorithms.syllables import count_syllables_in_word, is_complex_word
 from app.models.readability import (
     ReadabilityAnalysisResponse,
     SentenceComplexityModel,
 )
-
-
-def count_syllables_in_word(word: str) -> int:
-    clean = re.sub(r'[^a-z]', '', word.lower())
-    if not clean:
-        return 0
-    if len(clean) <= 3:
-        return 1
-
-    clean = re.sub(r'(?:es|ed|e)$', '', clean)
-    if not clean:
-        return 1
-
-    diphthongs = re.findall(r'[aeiouy]{1,2}', clean)
-    count = len(diphthongs)
-
-    if count == 0:
-        return 1
-    return count
-
-
-def is_complex_word(word: str, syllable_count: int) -> bool:
-    if syllable_count < 3:
-        return False
-    if word[0].isupper():
-        return False
-    if word.endswith(("ing", "ed", "es")):
-        base_syllables = count_syllables_in_word(re.sub(r'(?:ing|ed|es)$', '', word.lower()))
-        return base_syllables >= 3
-    return syllable_count >= 3
 
 
 def segment_text(text: str) -> Tuple[List[str], List[str]]:
