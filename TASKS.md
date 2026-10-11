@@ -14,13 +14,13 @@
   - [x] Build atomic component `MetricGauge.svelte` using pure SVG arc rendering without external animation bloat.
   - [x] Build atomic component `StatusBadge.svelte` supporting informational, positive, warning, and critical ink-wash variants.
 
-- [ ] Task 3: Feature Module 1 (Sentiment Analysis Engine) end-to-end implementation
-  - [ ] Implement pure Python algorithmic analyzer `sentiment_lexicon.py` computing polarity, subjectivity, and Plutchik emotion spectra.
-  - [ ] Define Pydantic request and response schemas in `apps/api/app/models/sentiment.py`.
-  - [ ] Implement async router `apps/api/app/api/v1/sentiment.py` with single-text and batch-text analysis endpoints.
-  - [ ] Write pytest integration suite `apps/api/tests/test_sentiment.py` asserting numerical correctness across edge cases.
-  - [ ] Build frontend sentiment visualization components `SentimentBreakdown.svelte` and `EmotionSpectrum.svelte`.
-  - [ ] Wire SvelteKit client API service to dispatch analysis requests and bind results to reactive state stores.
+- [x] Task 3: Feature Module 1 (Sentiment Analysis Engine) end-to-end implementation
+  - [x] Implement pure Python algorithmic analyzer `sentiment_lexicon.py` computing polarity, subjectivity, and Plutchik emotion spectra.
+  - [x] Define Pydantic request and response schemas in `apps/api/app/models/sentiment.py`.
+  - [x] Implement async router `apps/api/app/api/v1/sentiment.py` with single-text and batch-text analysis endpoints.
+  - [x] Write pytest integration suite `apps/api/tests/test_sentiment.py` asserting numerical correctness across edge cases.
+  - [x] Build frontend sentiment visualization components `SentimentBreakdown.svelte` and `EmotionSpectrum.svelte`.
+  - [x] Wire SvelteKit client API service to dispatch analysis requests and bind results to reactive state stores.
 
 - [ ] Task 4: Feature Module 2 (Readability & Linguistic Complexity Engine) end-to-end implementation
   - [ ] Implement English syllable counting heuristic engine in `syllables.py` handling dipthongs, silent endings, and suffixes.

@@ -8,7 +8,7 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic",
     "pydantic-settings",
-    "libsql",
+    "libsql-client",
 ]
 
 [project.optional-dependencies]
