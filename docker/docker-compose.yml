@@ -24,7 +24,7 @@ services:
     depends_on:
       - sqld
     ports:
-      - "8000:8000"
+      - "8005:8000"
     environment:
       ENVIRONMENT: development
       DATABASE_URL: http://sqld:8080
