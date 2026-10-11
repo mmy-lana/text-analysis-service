@@ -1,6 +1,6 @@
 import math
 import re
-from typing import Dict, List, Tuple
+
 from app.models.common import SentimentClassificationEnum
 from app.models.sentiment import (
     EmotionSpectrumModel,
@@ -8,7 +8,7 @@ from app.models.sentiment import (
     SentimentAnalysisResponse,
 )
 
-LEXICON_POLARITY: Dict[str, float] = {
+LEXICON_POLARITY: dict[str, float] = {
     "brilliant": 0.8,
     "excellent": 0.75,
     "superb": 0.8,
@@ -31,18 +31,65 @@ LEXICON_POLARITY: Dict[str, float] = {
     "ugly": -0.55,
 }
 
-EMOTION_LEXICON: Dict[str, Dict[str, float]] = {
-    "joy": {"delight": 0.8, "brilliant": 0.7, "victory": 0.9, "triumph": 0.85, "peace": 0.6, "celebrate": 0.75},
-    "sadness": {"mourn": 0.9, "grief": 0.95, "abysmal": 0.6, "loss": 0.7, "tragedy": 0.85, "alone": 0.5},
-    "anger": {"fury": 0.95, "rage": 0.9, "wrath": 0.85, "hate": 0.8, "bitter": 0.6, "infuriating": 0.75},
-    "fear": {"terror": 0.95, "panic": 0.9, "horrific": 0.85, "threat": 0.7, "dread": 0.8, "danger": 0.65},
-    "trust": {"faith": 0.8, "reliable": 0.7, "integrity": 0.85, "truth": 0.75, "honest": 0.7, "secure": 0.6},
-    "surprise": {"astonish": 0.85, "sudden": 0.5, "shock": 0.8, "unbelievable": 0.75, "wonder": 0.7},
+EMOTION_LEXICON: dict[str, dict[str, float]] = {
+    "joy": {
+        "delight": 0.8,
+        "brilliant": 0.7,
+        "victory": 0.9,
+        "triumph": 0.85,
+        "peace": 0.6,
+        "celebrate": 0.75,
+    },
+    "sadness": {
+        "mourn": 0.9,
+        "grief": 0.95,
+        "abysmal": 0.6,
+        "loss": 0.7,
+        "tragedy": 0.85,
+        "alone": 0.5,
+    },
+    "anger": {
+        "fury": 0.95,
+        "rage": 0.9,
+        "wrath": 0.85,
+        "hate": 0.8,
+        "bitter": 0.6,
+        "infuriating": 0.75,
+    },
+    "fear": {
+        "terror": 0.95,
+        "panic": 0.9,
+        "horrific": 0.85,
+        "threat": 0.7,
+        "dread": 0.8,
+        "danger": 0.65,
+    },
+    "trust": {
+        "faith": 0.8,
+        "reliable": 0.7,
+        "integrity": 0.85,
+        "truth": 0.75,
+        "honest": 0.7,
+        "secure": 0.6,
+    },
+    "surprise": {
+        "astonish": 0.85,
+        "sudden": 0.5,
+        "shock": 0.8,
+        "unbelievable": 0.75,
+        "wonder": 0.7,
+    },
     "disgust": {"revolt": 0.85, "nauseating": 0.9, "vile": 0.8, "rotten": 0.75, "ugly": 0.6},
-    "anticipation": {"await": 0.5, "prepare": 0.4, "horizon": 0.4, "longing": 0.6, "approaching": 0.5},
+    "anticipation": {
+        "await": 0.5,
+        "prepare": 0.4,
+        "horizon": 0.4,
+        "longing": 0.6,
+        "approaching": 0.5,
+    },
 }
 
-INTENSIFIERS: Dict[str, float] = {
+INTENSIFIERS: dict[str, float] = {
     "very": 1.3,
     "extremely": 1.5,
     "immensely": 1.6,
@@ -54,16 +101,16 @@ INTENSIFIERS: Dict[str, float] = {
 NEGATORS = {"not", "never", "no", "without", "hardly", "neither", "scarcely"}
 
 
-def split_into_sentences(text: str) -> List[str]:
-    raw_sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+def split_into_sentences(text: str) -> list[str]:
+    raw_sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     return [s.strip() for s in raw_sentences if s.strip()]
 
 
-def tokenize(sentence: str) -> List[str]:
-    return re.findall(r'\b[a-zA-Z]+\b', sentence.lower())
+def tokenize(sentence: str) -> list[str]:
+    return re.findall(r"\b[a-zA-Z]+\b", sentence.lower())
 
 
-def evaluate_sentiment_vector(tokens: List[str]) -> Tuple[float, float, float, float, float]:
+def evaluate_sentiment_vector(tokens: list[str]) -> tuple[float, float, float, float, float]:
     if not tokens:
         return 0.0, 0.0, 0.0, 1.0, 0.0
 
@@ -116,14 +163,14 @@ def evaluate_sentiment_vector(tokens: List[str]) -> Tuple[float, float, float, f
 def evaluate_emotions(text: str) -> EmotionSpectrumModel:
     tokens = tokenize(text)
     total_tokens = max(len(tokens), 1)
-    scores: Dict[str, float] = {e: 0.0 for e in EMOTION_LEXICON}
+    scores: dict[str, float] = {e: 0.0 for e in EMOTION_LEXICON}
 
     for token in tokens:
         for emotion, lexicon in EMOTION_LEXICON.items():
             if token in lexicon:
                 scores[emotion] += lexicon[token]
 
-    normalized: Dict[str, float] = {}
+    normalized: dict[str, float] = {}
     for emotion, raw in scores.items():
         scaled = raw / (total_tokens * 0.15 + 1.0)
         normalized[emotion] = round(max(0.0, min(1.0, scaled)), 4)
@@ -145,7 +192,7 @@ def classify_polarity(polarity: float) -> SentimentClassificationEnum:
 
 def analyze_sentiment(text: str) -> SentimentAnalysisResponse:
     sentences = split_into_sentences(text)
-    sentence_items: List[SentenceSentimentItem] = []
+    sentence_items: list[SentenceSentimentItem] = []
 
     all_tokens = tokenize(text)
     polarity, subjectivity, pos_score, neu_score, neg_score = evaluate_sentiment_vector(all_tokens)

@@ -51,9 +51,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(StarletteHTTPException)
-    async def http_problem_handler(
-        request: Request, exc: StarletteHTTPException
-    ) -> JSONResponse:
+    async def http_problem_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         return _problem(
             exc.status_code,
             "Request Failed",
@@ -62,9 +60,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_problem_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def unhandled_problem_handler(request: Request, exc: Exception) -> JSONResponse:
         return _problem(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "Internal Server Error",

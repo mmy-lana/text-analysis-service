@@ -20,10 +20,6 @@
 
   const band = $derived(bands.find((b) => readingEase >= b.min) ?? bands[bands.length - 1]);
   const bandIndex = $derived(bands.findIndex((b) => b.label === band?.label));
-
-  const variant = $derived(
-    bandIndex <= 1 ? 'positive' : bandIndex <= 3 ? 'neutral' : bandIndex <= 5 ? 'warning' : 'negative'
-  );
 </script>
 
 <div class="border border-paper-300 bg-paper-100 p-4 sm:p-6">

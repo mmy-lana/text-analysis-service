@@ -1,16 +1,16 @@
 import math
 import re
-from typing import List, Tuple
-from app.models.common import CEFREquivalentEnum
+
 from app.core.algorithms.syllables import count_syllables_in_word, is_complex_word
+from app.models.common import CEFREquivalentEnum
 from app.models.readability import (
     ReadabilityAnalysisResponse,
     SentenceComplexityModel,
 )
 
 
-def segment_text(text: str) -> Tuple[List[str], List[str]]:
-    raw_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
+def segment_text(text: str) -> tuple[list[str], list[str]]:
+    raw_sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
     words = re.findall(r"\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b", text)
     return raw_sentences, words
 
@@ -35,19 +35,25 @@ def analyze_readability(text: str) -> ReadabilityAnalysisResponse:
     total_words = max(len(words), 1)
 
     letters = sum(len(w) for w in words)
-    characters = len(re.sub(r'\s', '', text))
+    characters = len(re.sub(r"\s", "", text))
 
     syllable_counts = [count_syllables_in_word(w) for w in words]
     total_syllables = sum(syllable_counts)
-    complex_words = [w for w, syl in zip(words, syllable_counts) if is_complex_word(w, syl)]
+    complex_words = [
+        w for w, syl in zip(words, syllable_counts, strict=True) if is_complex_word(w, syl)
+    ]
     total_complex = len(complex_words)
 
     # Flesch Reading Ease
-    flesch_re = 206.835 - 1.015 * (total_words / total_sentences) - 84.6 * (total_syllables / total_words)
+    flesch_re = (
+        206.835 - 1.015 * (total_words / total_sentences) - 84.6 * (total_syllables / total_words)
+    )
     flesch_re = max(-20.0, min(120.0, flesch_re))
 
     # Flesch-Kincaid Grade Level
-    fk_grade = 0.39 * (total_words / total_sentences) + 11.8 * (total_syllables / total_words) - 15.59
+    fk_grade = (
+        0.39 * (total_words / total_sentences) + 11.8 * (total_syllables / total_words) - 15.59
+    )
     fk_grade = max(0.0, fk_grade)
 
     # Gunning Fog
@@ -77,7 +83,7 @@ def analyze_readability(text: str) -> ReadabilityAnalysisResponse:
     grade_string = f"Grade {round(consensus_avg, 1)}"
 
     # Sentence Decomposition
-    sentence_breakdown: List[SentenceComplexityModel] = []
+    sentence_breakdown: list[SentenceComplexityModel] = []
     for idx, s in enumerate(sentences):
         s_words = re.findall(r"\b[a-zA-Z]+(?:'[a-zA-Z]+)?\b", s)
         s_wc = max(len(s_words), 1)

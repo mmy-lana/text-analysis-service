@@ -37,10 +37,10 @@
   - [x] Implement offline-fallback synchronization using client-side IndexedDB when the local or cloud database is unreachable.
   - [x] Write integration tests verifying database transactions, rollbacks, and foreign-key cascading removals.
 
-- [ ] Task 6: Routing shell, responsive page assembly, and production build verification
-  - [ ] Assemble root layout `+layout.svelte`, `EditorialHeader.svelte`, and `EditorialFooter.svelte` matching paper-serif aesthetic.
-  - [ ] Construct main workbench page `apps/web/src/routes/+page.svelte` integrating text input, mode tabs, and dual metric panes.
-  - [ ] Enforce mobile-first responsive validation at 360px, 390px, 430px, 768px, and 1024px+ viewports.
-  - [ ] Validate touch ergonomics: verify all clickable targets exceed 44x44px with zero hover dependency.
-  - [ ] Write Docker multi-stage build files for `apps/api` and `apps/web`.
-  - [ ] Run end-to-end verification via Turborepo pipelines confirming clean TypeScript type-check and Python lint passing.
+- [x] Task 6: Routing shell, responsive page assembly, and production build verification
+  - [x] Assemble root layout `+layout.svelte`, `EditorialHeader.svelte`, and `EditorialFooter.svelte` matching paper-serif aesthetic.
+  - [x] Construct main workbench page `apps/web/src/routes/+page.svelte` integrating text input, mode tabs, and dual metric panes.
+  - [x] Enforce mobile-first responsive validation at 360px, 390px, 430px, 768px, and 1024px+ viewports.
+  - [x] Validate touch ergonomics: verify all clickable targets exceed 44x44px with zero hover dependency.
+  - [x] Write Docker multi-stage build files for `apps/api` and `apps/web`.
+  - [x] Run end-to-end verification via Turborepo pipelines confirming clean TypeScript type-check and Python lint passing.

@@ -1,5 +1,7 @@
-from typing import Annotated, List
+from typing import Annotated
+
 from pydantic import Field
+
 from app.models.common import BaseSchema, SentimentClassificationEnum
 
 
@@ -31,14 +33,14 @@ class SentimentAnalysisResponse(BaseSchema):
     neutrality_score: float = Field(ge=0.0, le=1.0)
     compound_score: float = Field(ge=-1.0, le=1.0)
     emotions: EmotionSpectrumModel
-    sentence_breakdown: List[SentenceSentimentItem]
+    sentence_breakdown: list[SentenceSentimentItem]
 
 
 class SentimentBatchRequest(BaseSchema):
-    texts: List[Annotated[str, Field(min_length=1, max_length=100000)]] = Field(
+    texts: list[Annotated[str, Field(min_length=1, max_length=100000)]] = Field(
         min_length=1, max_length=50
     )
 
 
 class SentimentBatchResponse(BaseSchema):
-    results: List[SentimentAnalysisResponse]
+    results: list[SentimentAnalysisResponse]

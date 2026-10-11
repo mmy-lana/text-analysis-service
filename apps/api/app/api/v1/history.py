@@ -7,12 +7,11 @@ pagination, keyword search, deletion, and API-key isolation.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from datetime import UTC, datetime
+from typing import Any
 
 import libsql_client
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.core.algorithms.readability_indexes import analyze_readability
 from app.core.algorithms.sentiment_lexicon import analyze_sentiment
@@ -31,7 +30,7 @@ from app.models.sentiment import SentimentAnalysisResponse
 router = APIRouter(prefix="/history", tags=["Historical Archive"])
 
 
-def resolve_api_key_id(request: Request) -> Optional[str]:
+def resolve_api_key_id(request: Request) -> str | None:
     """Derive the isolation key from the X-API-Key header; None for anonymous."""
     raw_key = request.headers.get("X-API-Key")
     if not raw_key:
@@ -39,19 +38,16 @@ def resolve_api_key_id(request: Request) -> Optional[str]:
     return hash_api_key(raw_key)
 
 
-def _compute_statistics(text: str) -> tuple[DocumentTextStatisticsModel, int]:
+def _compute_statistics(text: str) -> DocumentTextStatisticsModel:
     import re
 
     paragraphs = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
     sentences, words = _segment(text)
-    return (
-        DocumentTextStatisticsModel(
-            character_count=len(text),
-            word_count=len(words),
-            sentence_count=len(sentences),
-            paragraph_count=len(paragraphs),
-        ),
-        len(words),
+    return DocumentTextStatisticsModel(
+        character_count=len(text),
+        word_count=len(words),
+        sentence_count=len(sentences),
+        paragraph_count=len(paragraphs),
     )
 
 
@@ -85,7 +81,9 @@ def _sentiment_row_values(document_id: str, result: SentimentAnalysisResponse) -
     )
 
 
-def _readability_row_values(document_id: str, result: ReadabilityAnalysisResponse) -> tuple[Any, ...]:
+def _readability_row_values(
+    document_id: str, result: ReadabilityAnalysisResponse
+) -> tuple[Any, ...]:
     return (
         str(uuid.uuid4()),
         document_id,
@@ -104,7 +102,7 @@ def _readability_row_values(document_id: str, result: ReadabilityAnalysisRespons
     )
 
 
-def _isolation_clause(api_key_id: Optional[str]) -> tuple[str, list[Any]]:
+def _isolation_clause(api_key_id: str | None) -> tuple[str, list[Any]]:
     if api_key_id is not None:
         return "d.api_key_id = ?", [api_key_id]
     return "d.api_key_id IS NULL", []
@@ -115,11 +113,13 @@ def _isolation_clause(api_key_id: Optional[str]) -> tuple[str, list[Any]]:
     response_model=CompleteAnalysisResponseModel,
     status_code=status.HTTP_201_CREATED,
     summary="Persist Analyzed Document",
-    description="Runs both engines and stores the document with its sentiment and readability evaluations.",
+    description=(
+        "Runs both engines and stores the document with its sentiment and readability evaluations."
+    ),
 )
 async def store_document(
     payload: AnalysisSubmissionPayload,
-    api_key_id: Optional[str] = Depends(resolve_api_key_id),
+    api_key_id: str | None = Depends(resolve_api_key_id),
     db: Database = Depends(get_database),
 ) -> CompleteAnalysisResponseModel:
     text = payload.text.strip()
@@ -130,17 +130,20 @@ async def store_document(
         )
 
     title = payload.title or (text[:60] + ("..." if len(text) > 60 else ""))
-    statistics, word_count = _compute_statistics(text)
+    statistics = _compute_statistics(text)
     sentiment = analyze_sentiment(text)
     readability = analyze_readability(text)
 
     document_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     statements = [
         (
-            "INSERT INTO documents (id, api_key_id, title, raw_text, character_count, word_count, "
-            "sentence_count, paragraph_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "INSERT INTO documents (id, api_key_id, title, raw_text, character_count, "
+                "word_count, sentence_count, paragraph_count, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            ),
             [
                 document_id,
                 api_key_id,
@@ -155,17 +158,23 @@ async def store_document(
             ],
         ),
         (
-            "INSERT INTO sentiment_evaluations (id, document_id, polarity, subjectivity, classification, "
-            "positivity_score, negativity_score, neutrality_score, compound_score, joy_score, sadness_score, "
-            "anger_score, fear_score, trust_score, surprise_score, disgust_score, anticipation_score) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "INSERT INTO sentiment_evaluations (id, document_id, polarity, subjectivity, "
+                "classification, positivity_score, negativity_score, neutrality_score, "
+                "compound_score, joy_score, sadness_score, anger_score, fear_score, trust_score, "
+                "surprise_score, disgust_score, anticipation_score) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            ),
             list(_sentiment_row_values(document_id, sentiment)),
         ),
         (
-            "INSERT INTO readability_evaluations (id, document_id, flesch_reading_ease, flesch_kincaid_grade, "
-            "gunning_fog_index, coleman_liau_index, smog_index, automated_readability_index, "
-            "reading_time_seconds, speaking_time_seconds, syllable_count, complex_word_count, "
-            "grade_level_consensus, cefr_equivalent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "INSERT INTO readability_evaluations (id, document_id, flesch_reading_ease, "
+                "flesch_kincaid_grade, gunning_fog_index, coleman_liau_index, smog_index, "
+                "automated_readability_index, reading_time_seconds, speaking_time_seconds, "
+                "syllable_count, complex_word_count, grade_level_consensus, cefr_equivalent) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            ),
             list(_readability_row_values(document_id, readability)),
         ),
     ]
@@ -175,10 +184,7 @@ async def store_document(
     # Transactional batch: a failure in any evaluation insert rolls the whole
     # archival transaction back, leaving no orphan document row behind.
     await db._client.batch(  # type: ignore[union-attr]
-        [
-            libsql_client.Statement(sql, args=args)
-            for sql, args in statements
-        ]
+        [libsql_client.Statement(sql, args=args) for sql, args in statements]
     )
 
     return CompleteAnalysisResponseModel(
@@ -187,7 +193,7 @@ async def store_document(
         statistics=statistics,
         sentiment=sentiment,
         readability=readability,
-        processed_at=datetime.now(timezone.utc),
+        processed_at=datetime.now(UTC),
     )
 
 
@@ -200,8 +206,8 @@ async def store_document(
 async def list_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    search: Optional[str] = Query(default=None, max_length=255),
-    api_key_id: Optional[str] = Depends(resolve_api_key_id),
+    search: str | None = Query(default=None, max_length=255),
+    api_key_id: str | None = Depends(resolve_api_key_id),
     db: Database = Depends(get_database),
 ) -> PaginatedHistoryModel:
     where, params = _isolation_clause(api_key_id)
@@ -224,7 +230,7 @@ async def list_history(
         "JOIN readability_evaluations r ON r.document_id = d.id "
         f"WHERE {where} "
         "ORDER BY d.created_at DESC LIMIT ? OFFSET ?",
-        tuple(params) + (page_size, offset),
+        (*tuple(params), page_size, offset),
     )
 
     items = [
@@ -242,12 +248,12 @@ async def list_history(
 
 
 async def _fetch_document_or_404(
-    document_id: str, api_key_id: Optional[str], db: Database
+    document_id: str, api_key_id: str | None, db: Database
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     where, params = _isolation_clause(api_key_id)
     rows = await db.execute(
         f"SELECT d.* FROM documents d WHERE {where} AND d.id = ?",
-        tuple(params) + (document_id,),
+        (*tuple(params), document_id),
     )
     if not rows:
         raise HTTPException(
@@ -321,7 +327,7 @@ def _readability_from_row(row: dict[str, Any]) -> ReadabilityAnalysisResponse:
 )
 async def fetch_document(
     document_id: str,
-    api_key_id: Optional[str] = Depends(resolve_api_key_id),
+    api_key_id: str | None = Depends(resolve_api_key_id),
     db: Database = Depends(get_database),
 ) -> CompleteAnalysisResponseModel:
     document, sentiment_row, readability_row = await _fetch_document_or_404(
@@ -349,7 +355,7 @@ async def fetch_document(
 )
 async def delete_document(
     document_id: str,
-    api_key_id: Optional[str] = Depends(resolve_api_key_id),
+    api_key_id: str | None = Depends(resolve_api_key_id),
     db: Database = Depends(get_database),
 ) -> None:
     await _fetch_document_or_404(document_id, api_key_id, db)

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+
 from app.models.common import (
     BaseSchema,
     CEFREquivalentEnum,
@@ -11,7 +11,7 @@ from app.models.sentiment import SentimentAnalysisResponse
 
 
 class CompleteAnalysisResponseModel(BaseSchema):
-    document_id: Optional[str] = None
+    document_id: str | None = None
     title: str
     statistics: DocumentTextStatisticsModel
     sentiment: SentimentAnalysisResponse

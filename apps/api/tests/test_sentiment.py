@@ -60,9 +60,7 @@ class TestSentimentVector:
         assert 0.1 <= polarity <= 1.0
 
     def test_negative_text_yields_negative_polarity(self) -> None:
-        polarity, *_ = evaluate_sentiment_vector(
-            tokenize("A horrific catastrophic disaster")
-        )
+        polarity, *_ = evaluate_sentiment_vector(tokenize("A horrific catastrophic disaster"))
         assert polarity < -0.5
 
     def test_neutral_text(self) -> None:
@@ -221,9 +219,7 @@ class TestSentimentEndpoints:
         assert response.status_code == 422
 
     def test_oversized_text_is_rejected(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/sentiment/analyze", json={"text": "word " * 30000}
-        )
+        response = client.post("/api/v1/sentiment/analyze", json={"text": "word " * 30000})
         assert response.status_code == 422
 
     def test_batch_endpoint(self, client: TestClient) -> None:
@@ -243,7 +239,5 @@ class TestSentimentEndpoints:
         assert response.status_code == 422
 
     def test_batch_rejects_more_than_fifty(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/sentiment/batch", json={"texts": ["ok"] * 51}
-        )
+        response = client.post("/api/v1/sentiment/batch", json={"texts": ["ok"] * 51})
         assert response.status_code == 422

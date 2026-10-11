@@ -129,9 +129,7 @@ class TestReadabilityMetrics:
         sentence = result.sentence_breakdown[0]
         assert sentence.index == 0
         assert sentence.word_count == 13
-        assert sentence.character_count == sum(
-            len(w) for w in segment_text(SMOG_REFERENCE)[1]
-        )
+        assert sentence.character_count == sum(len(w) for w in segment_text(SMOG_REFERENCE)[1])
         assert -20.0 <= sentence.reading_ease <= 120.0
 
 
@@ -162,9 +160,7 @@ class TestEdgeCases:
 
 class TestReadabilityEndpoint:
     def test_endpoint_camel_case_contract(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/readability/analyze", json={"text": SIMPLE_REFERENCE}
-        )
+        response = client.post("/api/v1/readability/analyze", json={"text": SIMPLE_REFERENCE})
         assert response.status_code == 200
         body = response.json()
         assert "fleschReadingEase" in body
@@ -185,7 +181,5 @@ class TestReadabilityEndpoint:
         assert response.status_code == 422
 
     def test_oversized_text_rejected(self, client: TestClient) -> None:
-        response = client.post(
-            "/api/v1/readability/analyze", json={"text": "word " * 30000}
-        )
+        response = client.post("/api/v1/readability/analyze", json={"text": "word " * 30000})
         assert response.status_code == 422

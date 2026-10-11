@@ -10,13 +10,9 @@
 
   let { data }: Props = $props();
 
-  let archive = $state<HistoryFetchResult>(data.archive);
+  let archive = $derived(data.archive);
   let searchInput = $state('');
   let deletingId = $state<string | null>(null);
-
-  $effect(() => {
-    archive = data.archive;
-  });
 
   const classificationVariant = (classification: string) =>
     classification.startsWith('strongly_positive') || classification === 'positive'
@@ -26,7 +22,9 @@
         : 'neutral';
 
   async function refresh(page = archive.response.page, search = searchInput) {
-    archive = await historyRepository.list({ page, pageSize: archive.response.pageSize, search });
+    const next = await historyRepository.list({ page, pageSize: archive.response.pageSize, search });
+    data.archive = next;
+    archive = next;
   }
 
   async function runSearch() {

@@ -124,7 +124,8 @@ class TestTransactionsAndRollback:
                 "flesch_kincaid_grade, gunning_fog_index, coleman_liau_index, smog_index, "
                 "automated_readability_index, reading_time_seconds, speaking_time_seconds, "
                 "syllable_count, complex_word_count, grade_level_consensus, cefr_equivalent) "
-                "VALUES ('rb-eval', 'rollback-doc-id', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 'Grade 1', 'Z9')",
+                "VALUES ('rb-eval', 'rollback-doc-id', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, "
+                "'Grade 1', 'Z9')",
             ),
         ]
         with pytest.raises(libsql_client.LibsqlError):
@@ -182,16 +183,10 @@ class TestApiKeyIsolation:
         anon_list = client.get("/api/v1/history")
         assert all(item["title"] != "Keyed Document" for item in anon_list.json()["items"])
 
-        keyed_list = client.get(
-            "/api/v1/history", headers={"X-API-Key": "secret-key-123"}
-        )
-        assert any(
-            item["title"] == "Keyed Document" for item in keyed_list.json()["items"]
-        )
+        keyed_list = client.get("/api/v1/history", headers={"X-API-Key": "secret-key-123"})
+        assert any(item["title"] == "Keyed Document" for item in keyed_list.json()["items"])
 
-        other_key = client.get(
-            "/api/v1/history", headers={"X-API-Key": "different-key"}
-        )
+        other_key = client.get("/api/v1/history", headers={"X-API-Key": "different-key"})
         assert all(item["title"] != "Keyed Document" for item in other_key.json()["items"])
 
         anon_fetch = client.get(f"/api/v1/history/{document_id}")

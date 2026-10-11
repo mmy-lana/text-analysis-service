@@ -71,7 +71,7 @@
       <polygon points={ring} fill="none" stroke="var(--color-paper-300)" stroke-width="0.75" />
     {/each}
 
-    {#each chart as axis, i (axis.key)}
+    {#each chart as axis (axis.key)}
       <line
         x1={CENTER}
         y1={CENTER}
@@ -89,7 +89,7 @@
       stroke-width="1.5"
     />
 
-    {#each chart as axis, i (axis.key)}
+    {#each chart as axis (axis.key)}
       <circle cx={axis.point.x} cy={axis.point.y} r="2" fill="var(--color-cobalt-base)" />
       <text
         x={axis.vertex.x * 1.14 - CENTER * 0.14 + CENTER}

@@ -1,5 +1,7 @@
 import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+
 from app.core.algorithms.sentiment_lexicon import analyze_sentiment
 from app.models.common import AnalysisSubmissionPayload
 from app.models.sentiment import (
@@ -27,7 +29,10 @@ async def run_bounded_sentiment_analysis(
     response_model=SentimentAnalysisResponse,
     status_code=status.HTTP_200_OK,
     summary="Compute Text Sentiment",
-    description="Asynchronously parses text payload and returns polarity, subjectivity, and discrete emotions.",
+    description=(
+        "Asynchronously parses text payload and returns polarity, subjectivity, "
+        "and discrete emotions."
+    ),
 )
 async def analyze_single_sentiment(payload: AnalysisSubmissionPayload) -> SentimentAnalysisResponse:
     cleaned = payload.text.strip()
@@ -44,7 +49,9 @@ async def analyze_single_sentiment(payload: AnalysisSubmissionPayload) -> Sentim
     response_model=SentimentBatchResponse,
     status_code=status.HTTP_200_OK,
     summary="Compute Batch Sentiments",
-    description="Processes up to 50 individual text segments concurrently with bounded thread execution.",
+    description=(
+        "Processes up to 50 individual text segments concurrently with bounded thread execution."
+    ),
 )
 async def analyze_batch_sentiment(
     payload: SentimentBatchRequest,

@@ -1,5 +1,5 @@
-from typing import List
 from pydantic import Field
+
 from app.models.common import BaseSchema, CEFREquivalentEnum
 
 
@@ -10,7 +10,9 @@ class SentenceComplexityModel(BaseSchema):
     syllable_count: int = Field(ge=0, description="Total syllables in sentence")
     character_count: int = Field(ge=0, description="Total character count excluding spaces")
     complex_word_count: int = Field(ge=0, description="Count of words with 3 or more syllables")
-    reading_ease: float = Field(ge=-20.0, le=120.0, description="Sentence-level Flesch Reading Ease score")
+    reading_ease: float = Field(
+        ge=-20.0, le=120.0, description="Sentence-level Flesch Reading Ease score"
+    )
     is_extremely_long: bool = Field(description="True if word count is 30 or greater")
 
 
@@ -27,4 +29,4 @@ class ReadabilityAnalysisResponse(BaseSchema):
     complex_word_count: int = Field(ge=0)
     grade_level_consensus: str
     cefr_equivalent: CEFREquivalentEnum
-    sentence_breakdown: List[SentenceComplexityModel]
+    sentence_breakdown: list[SentenceComplexityModel]

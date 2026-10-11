@@ -1,6 +1,6 @@
-from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
@@ -37,8 +37,8 @@ class ProblemDetailsModel(BaseSchema):
     title: str
     status: int
     detail: str
-    instance: Optional[str] = None
-    errors: Optional[List[dict[str, Any]]] = None
+    instance: str | None = None
+    errors: list[dict[str, Any]] | None = None
 
 
 class DocumentTextStatisticsModel(BaseSchema):
@@ -49,7 +49,7 @@ class DocumentTextStatisticsModel(BaseSchema):
 
 
 class AnalysisSubmissionPayload(BaseSchema):
-    title: Optional[str] = Field(default=None, max_length=255)
+    title: str | None = Field(default=None, max_length=255)
     text: str = Field(min_length=1, max_length=100000)
     store_result: bool = Field(default=False)
 

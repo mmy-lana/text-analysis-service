@@ -63,13 +63,9 @@ class Database:
         result_sets = await self._client.batch(
             [libsql_client.Statement(sql, args=args) for sql, args in statements]
         )
-        return [
-            [row.asdict() for row in result_set.rows] for result_set in result_sets
-        ]
+        return [[row.asdict() for row in result_set.rows] for result_set in result_sets]
 
-    async def execute_write(
-        self, sql: str, parameters: tuple[Any, ...] | list[Any] = ()
-    ) -> None:
+    async def execute_write(self, sql: str, parameters: tuple[Any, ...] | list[Any] = ()) -> None:
         """Execute a mutating statement (auto-committed by the Hrana pipeline)."""
         await self.execute(sql, parameters)
 

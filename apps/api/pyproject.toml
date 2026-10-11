@@ -23,6 +23,15 @@ dev = [
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "BLE", "ISC", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# `Depends(...)` in argument defaults is the canonical FastAPI pattern.
+"app/api/**/*.py" = ["B008"]
+# Healthcheck deliberately swallows every failure mode.
+"app/database.py" = ["BLE001"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

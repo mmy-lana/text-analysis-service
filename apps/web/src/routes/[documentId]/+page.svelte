@@ -1,6 +1,5 @@
 <script lang="ts">
   import { PaperCard, StatusBadge } from '$lib/components/ui/index.ts';
-  import { historyRepository } from '$lib/stores/historyStore.svelte.ts';
   import type { CompleteAnalysisResponse } from '@repo/shared-types';
 
   interface Props {
