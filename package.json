@@ -1,6 +1,10 @@
 {
   "name": "text-analysis-service",
   "private": true,
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",

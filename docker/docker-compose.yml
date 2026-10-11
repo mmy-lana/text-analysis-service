@@ -1,0 +1,43 @@
+name: text-analysis-service
+
+services:
+  sqld:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    container_name: tas-sqld
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      SQLD_NODE_ID: 1
+      SQLD_HTTP_LISTEN_ADDR: 0.0.0.0:8080
+      SQLD_GRPC_LISTEN_ADDR: 0.0.0.0:8081
+      SQLD_DB_PATH: /var/lib/sqld/data
+    volumes:
+      - sqld-data:/var/lib/sqld/data
+      - ./sqld/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: tas-api
+    depends_on:
+      sqld:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: http://sqld:8080
+      DATABASE_AUTH_TOKEN: ""
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:4173"]'
+    restart: unless-stopped
+
+volumes:
+  sqld-data:

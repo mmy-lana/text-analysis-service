@@ -1,10 +1,10 @@
-- [ ] Task 1: Environment baseline, types, and DB client initializers
-  - [ ] Initialize Turborepo root configuration, `pnpm-workspace.yaml`, and `.npmrc` with strict isolation.
-  - [ ] Provision `docker/docker-compose.yml` defining offline `sqld` local database and local Python container.
-  - [ ] Implement `docker/sqld/init.sql` containing full DDL for documents, sentiment, and readability tables.
-  - [ ] Scaffold `packages/shared-types` with TypeScript definitions mirroring the domain schemas.
-  - [ ] Scaffold `apps/api` with Python toolchain (`pyproject.toml`), asynchronous database connector, and lifespan events.
-  - [ ] Scaffold `apps/web` with SvelteKit, Vite, and strict TypeScript compilation targets.
+- [x] Task 1: Environment baseline, types, and DB client initializers
+  - [x] Initialize Turborepo root configuration, `pnpm-workspace.yaml`, and `.npmrc` with strict isolation.
+  - [x] Provision `docker/docker-compose.yml` defining offline `sqld` local database and local Python container.
+  - [x] Implement `docker/sqld/init.sql` containing full DDL for documents, sentiment, and readability tables.
+  - [x] Scaffold `packages/shared-types` with TypeScript definitions mirroring the domain schemas.
+  - [x] Scaffold `apps/api` with Python toolchain (`pyproject.toml`), asynchronous database connector, and lifespan events.
+  - [x] Scaffold `apps/web` with SvelteKit, Vite, and strict TypeScript compilation targets.
 
 - [ ] Task 2: Core design system primitives and atomic UI components
   - [ ] Configure Tailwind CSS v4 in `apps/web/src/app.css` using the `@theme` directive with editorial serif palette.

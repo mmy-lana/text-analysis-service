@@ -10,6 +10,6 @@
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",
-    "typescript": "latest"
+    "typescript": "~5.9.3"
   }
 }
