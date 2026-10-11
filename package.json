@@ -1,0 +1,12 @@
+{
+  "name": "text-analysis-service",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "check": "turbo check"
+  },
+  "devDependencies": {
+    "turbo": "latest"
+  }
+}
